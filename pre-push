@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+
+#    .---------- constant part!
+#    vvvv vvvv-- the code from above
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\e[93m'
+
+# BEGIN CHECK BRANCH NAME CONTRACT
+
+LC_ALL=C
+
+echo -e "       ${BLUE}Checking if your branch follows the branch naming contract.${NC}"
+
+# WE STORE THE ACTUAL BRANCH NAME
+local_branch="$(git rev-parse --abbrev-ref HEAD)"
+# THIS IS THE CONTRACT THAT THE BRANCH NAME MUST ACCOMPLISH
+valid_branch_regex="^((feature|bugfix|improvement|library|prerelease|release|hotfix)\/).*[a-zA-Z-].*$"
+# JUST A MESSAGE
+message="Your branch ${RED}$local_branch${NC} does not meets the branch-name requeriments. It must adhere to this contract: ${RED}$valid_branch_regex${NC}. Your commit will be rejected. You should rename your branch to a valid name and try again."
+
+# CHECK BRANCH NAME CONVENTION
+if [[ ! $local_branch =~ $valid_branch_regex ]] ;
+    then
+        echo -e "$message"
+        exit 1
+    else
+        echo -e "     ${GREEN}- Your branch meets the requeriments.${NC}"
+fi
+
+# END CHECK BRANCH NAME CONTRACT
+
+# BEGIN CHECK MERGE CONFLICT
+echo -e "       ${BLUE}Checking if your branch has conflicts with master.${NC}"
+
+# WE MOVE TO MASTER AND SIMULATE A MERGE OF YOUR BRANCH WITH THE LATEST MASTER
+git checkout master &> /dev/null
+git pull origin master &> /dev/null
+git reset --hard origin/master &> /dev/null
+git merge $local_branch &> /dev/null
+
+# WE CHECK IF ANY CONFLICTS WERE FOUNDS ON THE MERGE SIMULATION
+CONFLICTS=$(git ls-files -u | wc -l)
+if [ "$CONFLICTS" -gt 0 ] ; 
+    then
+        # IF SO, WE NEED TO SHOW THEM, THEN REVERT THE FAILED MERGE
+        echo -e "${RED}Your branch cannot be merged to master. Aborting${NC}"
+        git diff --check
+        git merge --abort
+        git checkout $local_branch
+        git reset --hard &> /dev/null
+        exit 1
+    else 
+        # IF NOT, WE STILL NEED TO REVERT THE MASTER CHANGES TO KEEP THE LOCAL MASTER
+        # LOCAL MASTER MUST BE ALWAYS IN SYNC WITH OUR REMOTE MASTER
+        git checkout master &> /dev/null && git reset --hard origin/master &> /dev/null
+        git checkout $local_branch &> /dev/null
+        # AFTER THAT, WE RESTORE OUR PREVIOUS LOCAL CHANGES
+        # THEY WERE LOST ON MERGE SIMULATE
+        git reset --hard &> /dev/null
+        # NOW WE ADD THEM TO THE COMMIT AGAIN
+        # NOTE: THIS WILL NOT TRIGGER ANY PRE-COMMIT HOOK
+        echo -e "     ${GREEN}- Your branch is able to be merged.${NC}"
+fi
+
+# END CHECK MERGE CONFLICT
+
+echo -e "       ${BLUE}Checking if your code has sensitive data.${NC}"
+
+# BEGIN GITLEAKS CHECK FOR SENSITIVE HARDCODED DATA ON THE REPOSITORY
+if ! gitleaks --repo-path=./ ;
+    then
+        echo -e "Please visit ${BLUE}https://computingforgeeks.com/gitleaks-audit-git-repos-for-secrets/ ${NC}and install gitleaks."
+        echo -e "${RED}Make sure that you don't have sensitive data in your repository.${NC}"
+        exit 1
+    else
+        echo -e "     ${GREEN}- Your repository has no leaks. Congrats!.${NC}"
+fi
+
+# END GITLEAKS CHECK FOR SENSITIVE HARDCODED DATA ON THE REPOSITORY
+
+
+exit 0
