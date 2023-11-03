@@ -67,12 +67,26 @@ fi
 
 # END CHECK MERGE CONFLICT
 
+echo -e "       ${BLUE}Checking if your test pass.${NC}"
+
+# BEGIN TESTS
+if ! make test ;
+    then
+        echo -e "${RED}Revisit your tests.${NC}"
+        exit 1
+    else
+        echo -e "     ${GREEN}- Your branch test have passed!.${NC}"
+fi
+
+# END TESTS
+
 echo -e "       ${BLUE}Checking if your code has sensitive data.${NC}"
 
+
 # BEGIN GITLEAKS CHECK FOR SENSITIVE HARDCODED DATA ON THE REPOSITORY
-if ! gitleaks --repo-path=./ ;
+if ! gitleaks -v --repo-path=./ --threads=$CPU --report=gitleaks_results.json ;
     then
-        echo -e "Please visit ${BLUE}https://computingforgeeks.com/gitleaks-audit-git-repos-for-secrets/ ${NC}and install gitleaks."
+        echo -e "Please visit ${BLUE}https://computingforgeeks.com/gitleaks-audit-git-repos-for-secrets/ ${NC}and install gitleaks and get info."
         echo -e "${RED}Make sure that you don't have sensitive data in your repository.${NC}"
         exit 1
     else
@@ -81,5 +95,17 @@ fi
 
 # END GITLEAKS CHECK FOR SENSITIVE HARDCODED DATA ON THE REPOSITORY
 
+echo -e "       ${BLUE}Checking if your cloudformation template syntax is ok.${NC}"
+
+# BEGIN CLOUDFORMATION LINT
+if ! cfn-lint -t template.yaml ;
+    then
+        echo -e "${RED}Revisit your template.${NC}"
+        exit 1
+    else
+        echo -e "     ${GREEN}- Your branch template.yaml is ok!.${NC}"
+fi
+
+# END CLOUDFORMATION LINT  
 
 exit 0
